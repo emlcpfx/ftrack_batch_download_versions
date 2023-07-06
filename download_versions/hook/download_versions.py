@@ -45,8 +45,11 @@ class DownloadVersions(BaseAction):
         return True
 
     def launch(self, session, entities, event):
+        server_location = session.query('Location where name is "ftrack.server"').one()
+        review_location = session.query('Location where name is "ftrack.review"').one()
+        locations = [server_location, review_location]
         downloadRootPath = str(Path.home() / "Downloads")
-        fileType = ".mov"
+        fileTypes = [".mov", ".mp4"]
         userID = event['source'].get('user', {}).get('id', None) #Current User ID
         downloads = list()
 
@@ -63,7 +66,9 @@ class DownloadVersions(BaseAction):
             for component in version.get("components"):
                 
                 # If this component is of the right fileType, then download it
-                if component.get("file_type") == fileType:
+                fileType = component.get("file_type")
+                print(fileType)
+                if fileType in fileTypes:
                     
                     # Check if we have a version name that seems to match the component name
                     versionName = version.get("_link")[-1]["name"].replace(" ", "_")
@@ -76,10 +81,15 @@ class DownloadVersions(BaseAction):
 
                     # Calculate the full download path and URL to pull from
                     downloadPath = os.path.join(downloadRootPath, fileName)
-                    url = component.get("component_locations")[0].get("url")["value"]
-
-                    # Push this pair onto the download list
-                    downloads.append((fileName, url, downloadPath))
+                    for location in locations:
+                        try:
+                            url = location.get_url(component)
+                            # url = component.get("component_locations")[0].get("url")["value"]
+                        except:
+                            url = None
+                        if url:
+                            # Push this pair onto the download list
+                            downloads.append((fileName, url, downloadPath))
 
         # Now that we have a full list of stuff to download, do it!
         downloadNum = 0
